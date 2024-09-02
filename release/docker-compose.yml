@@ -1,0 +1,15 @@
+version: '3'  # 指定 Docker Compose 文件的版本，推荐使用最新版本
+
+services:
+  home_service:
+    image: debian:latest  # 使用 Nginx 的轻量级版本
+    container_name: home_service
+    restart: on-failure
+    command:
+      - cd /root/home && ./home
+    ports:
+      - "3010:3010"  # 将宿主机的端口 80 映射到容器的端口 80
+    volumes:
+      - /volume2/workspace/tools/home/:/root/home  # 将宿主机的 ./html 目录挂载到容器的 /usr/share/nginx/html 目录
+    networks:
+      - bridge  # 指定服务使用的网络
