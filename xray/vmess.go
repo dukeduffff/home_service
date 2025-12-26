@@ -4,20 +4,30 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/dukeduffff/home_service/xray/config"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
-	"sync"
 )
 
-var vmessConfigs []*config.VmessConfig
-var lock sync.Mutex
+type VmessConfig struct {
+	Add      string `json:"add"`
+	Id       string `json:"id"`
+	Port     string `json:"port"`
+	Ps       string `json:"ps"`
+	Security string `json:"security"`
+	Net      string `json:"tcp"`
+	Sni      string `json:"sni"`
+	V        string `json:"v"`
+	Fp       string `json:"fp"`
+	Type     string `json:"type"`
+	Aid      string `json:"aid"`
+	Host     string `json:"host"`
+	Tls      string `json:"tls"`
+}
 
-func appendVmessConfig(config *config.VmessConfig) {
+var vmessConfigs []*VmessConfig
+
+func appendVmessConfig(config *VmessConfig) {
 	defer func() { lock.Unlock() }()
 	lock.Lock()
 	vmessConfigs = append(vmessConfigs, config)
@@ -26,17 +36,17 @@ func appendVmessConfig(config *config.VmessConfig) {
 func clearConfigs() {
 	defer func() { lock.Unlock() }()
 	lock.Lock()
-	vmessConfigs = []*config.VmessConfig{}
+	vmessConfigs = []*VmessConfig{}
 }
 
-func AddVmess(ctx *gin.Context) {
+func (v *VmessConfig) AddConfig(ctx *gin.Context) {
 	ip := ctx.Query("ip")
 	ps := ctx.Query("ps")
 	port := ctx.Query("port")
 	id := ctx.DefaultQuery("id", "1f8f05a1-1a29-4862-a91a-ecb2a4a5e272")
 	net := ctx.DefaultQuery("net", "tcp")
 	security := ctx.DefaultQuery("security", "none")
-	appendVmessConfig(&config.VmessConfig{
+	appendVmessConfig(&VmessConfig{
 		Add:      ip,
 		Ps:       ps,
 		Port:     port,
@@ -55,13 +65,7 @@ func AddVmess(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, response)
 }
 
-func GenConfig(ctx *gin.Context) {
-	if len(vmessConfigs) <= 0 {
-		ctx.JSON(http.StatusOK, gin.H{
-			"message": "无可生成的配置",
-			"code":    1,
-		})
-	}
+func (v *VmessConfig) GenConfig() ([]string, error) {
 	var configBytes [][]byte
 	for _, c := range vmessConfigs {
 		bytes, err := json.Marshal(c)
@@ -77,18 +81,9 @@ func GenConfig(ctx *gin.Context) {
 		configStr := base64.StdEncoding.EncodeToString(cs)
 		base64Strs = append(base64Strs, fmt.Sprintf("vmess://%s", configStr))
 	}
-	// 写到文件中
-	finalConfigStr := strings.Join(base64Strs, "\n")
-	base64FinalConfigStr := base64.StdEncoding.EncodeToString([]byte(finalConfigStr))
-	configPath := "./static/config.txt"
-	if err := os.MkdirAll(filepath.Dir(configPath), os.ModePerm); err != nil {
-		log.Errorf("Failed to create directories: %v", err)
-		return
-	}
-	os.WriteFile("./static/config.txt", []byte(base64FinalConfigStr), 0644)
+	return base64Strs, nil
+}
+
+func (v *VmessConfig) Clear() {
 	clearConfigs()
-	ctx.JSON(http.StatusOK, gin.H{
-		"message": "生成成功",
-		"code":    0,
-	})
 }
